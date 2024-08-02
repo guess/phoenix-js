@@ -1,0 +1,57 @@
+name: Update Phoenix JS
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Run daily at midnight UTC
+  workflow_dispatch:  # Allow manual triggers
+
+jobs:
+  update-phoenix-js:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.14.0'  # Use the latest stable version
+          otp-version: '25.0'  # Use a compatible OTP version
+
+      - name: Install dependencies
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+          mix deps.get
+
+      - name: Fetch latest Phoenix version
+        id: fetch-version
+        run: |
+          LATEST_VERSION=$(mix hex.info phoenix | grep 'Releases:' | awk '{print $2}' | sed 's/,$//')
+          echo "LATEST_VERSION=$LATEST_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update package.json version
+        run: |
+          LATEST_VERSION=${{ steps.fetch-version.outputs.LATEST_VERSION }}
+          sed -i.bak 's/"version": ".*"/"version": "'"$LATEST_VERSION"'"/' package.json && rm package.json.bak
+
+      - name: Fetch latest Phoenix JS code
+        run: |
+          git clone https://github.com/phoenixframework/phoenix.git
+          cp -R phoenix/assets/js/* ./src/
+
+      - name: Commit and push if there are changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update Phoenix JS to version ${{ steps.fetch-version.outputs.LATEST_VERSION }}" && git push)
+
+      - name: Create Release
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create v${{ steps.fetch-version.outputs.LATEST_VERSION }} \
+            --title "Release ${{ steps.fetch-version.outputs.LATEST_VERSION }}" \
+            --notes "Automatically updated to Phoenix JS version ${{ steps.fetch-version.outputs.LATEST_VERSION }}"
+
