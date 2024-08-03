@@ -33,7 +33,7 @@ jobs:
       - name: Fetch latest Phoenix JS code
         run: |
           git clone https://github.com/phoenixframework/phoenix.git
-          cp -R phoenix/assets/js/* ./src/
+          cp -R phoenix/assets/js/phoenix/* ./src/
 
       - name: Commit and push if there are changes
         env:
