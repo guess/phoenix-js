@@ -10,12 +10,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0 # Fetch all history for all branches and tags
 
       - name: Set up Elixir
         uses: erlef/setup-beam@v1
         with:
-          elixir-version: "1.14.0"
-          otp-version: "25.0"
+          elixir-version: "1.14.0" # Use the latest stable version
+          otp-version: "25.0" # Use a compatible OTP version
 
       - name: Fetch latest Phoenix version
         id: fetch-version
@@ -34,9 +36,11 @@ jobs:
           cp -R phoenix/assets/js/* ./src/
 
       - name: Commit and push if there are changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
+          git config --local user.email "actions@github.com"
+          git config --local user.name "Github Action"
           git add .
           git diff --quiet && git diff --staged --quiet || (git commit -m "Update Phoenix JS to version ${{ steps.fetch-version.outputs.LATEST_VERSION }}" && git push)
 
