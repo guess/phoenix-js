@@ -25,27 +25,52 @@ jobs:
           LATEST_VERSION=$(mix hex.info phoenix | grep 'Releases:' | awk '{print $2}' | sed 's/,$//')
           echo "LATEST_VERSION=$LATEST_VERSION" >> $GITHUB_OUTPUT
 
+      - name: Check if release already exists
+        id: check-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view v${{ steps.fetch-version.outputs.LATEST_VERSION }} &> /dev/null; then
+            echo "RELEASE_EXISTS=true" >> $GITHUB_OUTPUT
+          else
+            echo "RELEASE_EXISTS=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Update package.json version
+        if: steps.check-release.outputs.RELEASE_EXISTS == 'false'
         run: |
           LATEST_VERSION=${{ steps.fetch-version.outputs.LATEST_VERSION }}
           sed -i.bak 's/"version": ".*"/"version": "'"$LATEST_VERSION"'"/' package.json && rm package.json.bak
 
       - name: Fetch latest Phoenix JS code
+        if: steps.check-release.outputs.RELEASE_EXISTS == 'false'
         run: |
           git clone https://github.com/phoenixframework/phoenix.git
           cp -R phoenix/assets/js/phoenix/* ./src/
+          rm -rf phoenix
+
+      - name: Check for changes
+        id: check-changes
+        run: |
+          git add .
+          if git diff --staged --exit-code; then
+            echo "CHANGES_EXIST=false" >> $GITHUB_OUTPUT
+          else
+            echo "CHANGES_EXIST=true" >> $GITHUB_OUTPUT
+          fi
 
       - name: Commit and push if there are changes
+        if: steps.check-release.outputs.RELEASE_EXISTS == 'false' && steps.check-changes.outputs.CHANGES_EXIST == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --local user.email "steve@stevestrates.com"
           git config --local user.name "Steve Strates"
-          git add .
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update Phoenix JS to version ${{ steps.fetch-version.outputs.LATEST_VERSION }}" && git push)
+          git commit -m "Update Phoenix JS to version ${{ steps.fetch-version.outputs.LATEST_VERSION }}"
+          git push
 
       - name: Create Release
-        if: success()
+        if: steps.check-release.outputs.RELEASE_EXISTS == 'false' && steps.check-changes.outputs.CHANGES_EXIST == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
