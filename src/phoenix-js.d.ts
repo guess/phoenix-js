@@ -145,7 +145,7 @@ declare module '@guess/phoenix-js' {
      * @param {number} [timeout]
      * @returns {Push}
      */
-    push(event: string, payload: object, timeout?: number): Push;
+    push(event: string, payload?: object, timeout?: number): Push;
 
     /** Leaves the channel
      * @param {number} timeout
